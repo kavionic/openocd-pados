@@ -170,6 +170,7 @@ extern const struct rtos_type hwthread_rtos;
 extern const struct rtos_type linux_rtos;
 extern const struct rtos_type mqx_rtos;
 extern const struct rtos_type nuttx_rtos;
+extern const struct rtos_type pados_rtos;
 extern const struct rtos_type riot_rtos;
 extern const struct rtos_type rtkernel_rtos;
 extern const struct rtos_type threadx_rtos;

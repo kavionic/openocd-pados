@@ -5425,7 +5425,7 @@ The value should normally correspond to a static mapping for the
 @var{rtos_type} can be one of @option{auto}, @option{none}, @option{eCos},
 @option{ThreadX}, @option{FreeRTOS}, @option{linux}, @option{ChibiOS},
 @option{embKernel}, @option{mqx}, @option{uCOS-III}, @option{nuttx},
-@option{RIOT}, @option{Zephyr}, @option{rtkernel}
+@option{PadOS}, @option{RIOT}, @option{Zephyr}, @option{rtkernel}
 @xref{gdbrtossupport,,RTOS Support}.
 
 @item @code{-defer-examine} -- skip target examination at initial JTAG chain
@@ -13576,6 +13576,7 @@ Currently supported rtos's include:
 @item @option{mqx}
 @item @option{uCOS-III}
 @item @option{nuttx}
+@item @option{PadOS}
 @item @option{RIOT}
 @item @option{hwthread} (This is not an actual RTOS. @xref{usingopenocdsmpwithgdb,,Using OpenOCD SMP with GDB}.)
 @item @option{Zephyr}
@@ -13614,6 +13615,8 @@ _mqx_kernel_data, MQX_init_struct.
 OSRunning, OSTCBCurPtr, OSTaskDbgListPtr, OSTaskQty.
 @item nuttx symbols
 g_readytorun, g_tasklisttable.
+@item PadOS symbols
+_kernel_debugger_info.
 @item RIOT symbols
 @raggedright
 sched_threads, sched_num_threads, sched_active_pid, max_threads,
@@ -13640,6 +13643,19 @@ contrib/rtos-helpers/FreeRTOS-openocd.c
 @item uC/OS-III
 contrib/rtos-helpers/uCOS-III-openocd.c
 @end table
+
+PadOS support requires the STM32H7 Cortex-M port and version 1 of the debugger
+interface defined in @file{Include/Kernel/KDebugger.h}. The firmware must retain
+@code{_kernel_debugger_info} and its referenced metadata. Enable support with:
+
+@example
+$_TARGETNAME configure -rtos PadOS
+@end example
+
+Thread names, states, priorities, and saved core and floating-point registers
+are available. PadOS thread IDs are used directly, except that idle's ID zero
+is reported as @code{0x7fffffff}, which the firmware must reserve from PID
+allocation.
 
 @anchor{usingopenocdsmpwithgdb}
 @section Using OpenOCD SMP with GDB

@@ -21,6 +21,8 @@ noinst_LTLIBRARIES += %D%/librtos.la
 	%D%/mqx.c \
 	%D%/ucos_iii.c \
 	%D%/nuttx.c \
+	%D%/pados.c \
+	%D%/pados.h \
 	%D%/rtkernel.c \
 	%D%/hwthread.c \
 	%D%/zephyr.c \

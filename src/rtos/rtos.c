@@ -27,6 +27,7 @@ static const struct rtos_type *rtos_types[] = {
 	&linux_rtos,
 	&mqx_rtos,
 	&nuttx_rtos,
+	&pados_rtos,
 	&riot_rtos,
 	&rtkernel_rtos,
 	&threadx_rtos,

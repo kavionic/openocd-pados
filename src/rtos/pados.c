@@ -13,6 +13,7 @@
 #include "helper/bits.h"
 #include "helper/log.h"
 #include "helper/types.h"
+#include "server/gdb_server.h"
 #include "target/armv7m.h"
 #include "target/register.h"
 #include "rtos.h"
@@ -374,6 +375,118 @@ static int pados_find_thread(struct target *target, const uint32_t *info,
 	return ERROR_FAIL;
 }
 
+static int pados_get_tls_address(struct rtos *rtos, uint32_t thread_id,
+		uint32_t offset, uint32_t module, uint32_t *tls_address)
+{
+	if (!thread_id || thread_id > PADOS_IDLE_THREAD_ID || !pados_thread_exists(rtos, thread_id))
+		return ERROR_FAIL;
+
+	uint32_t info[PADOS_INFO_COUNT];
+	int retval = pados_read_info(rtos, info);
+	if (retval != ERROR_OK)
+		return retval;
+
+	uint32_t tls_offset;
+	if (module == PADOS_TLS_MODULE_KERNEL)
+		tls_offset = info[PADOS_THREAD_KERNEL_TLS_OFFSET];
+	else if (module == PADOS_TLS_MODULE_USERSPACE)
+		tls_offset = info[PADOS_THREAD_USERSPACE_TLS_OFFSET];
+	else
+		return ERROR_FAIL;
+	if (tls_offset == UINT32_MAX)
+		return ERROR_FAIL;
+
+	uint32_t identifier = thread_id == PADOS_IDLE_THREAD_ID ? 0 : thread_id;
+	uint32_t address;
+	if (thread_id == rtos->current_thread) {
+		/* The bootstrap idle thread need not be in the debugger list yet. */
+		retval = target_read_u32(rtos->target, info[PADOS_CURRENT_THREAD], &address);
+		if (retval != ERROR_OK)
+			return retval;
+		if (!address)
+			return ERROR_FAIL;
+		uint32_t current_identifier;
+		retval = target_read_u32(rtos->target,
+			(target_addr_t)address + info[PADOS_THREAD_ID_OFFSET], &current_identifier);
+		if (retval != ERROR_OK)
+			return retval;
+		if (current_identifier != identifier)
+			return ERROR_FAIL;
+	} else {
+		retval = pados_find_thread(rtos->target, info, identifier, &address);
+		if (retval != ERROR_OK)
+			return retval;
+	}
+
+	target_addr_t pointer_address = (target_addr_t)address + tls_offset;
+	if (pointer_address > UINT32_MAX - sizeof(uint32_t) + 1)
+		return ERROR_FAIL;
+	uint32_t tls;
+	retval = target_read_u32(rtos->target, pointer_address, &tls);
+	if (retval != ERROR_OK)
+		return retval;
+	if (!tls)
+		return ERROR_FAIL;
+
+	target_addr_t result = (target_addr_t)tls + info[PADOS_TLS_DATA_OFFSET] + offset;
+	if (result > UINT32_MAX)
+		return ERROR_FAIL;
+	*tls_address = result;
+	return ERROR_OK;
+}
+
+/* Parse the thread ID, TLS offset, and module ID without accepting signs,
+ * prefixes, trailing data, or values outside the target's 32-bit range.
+ * OpenOCD's RTOS thread IDs do not use the multiprocess packet syntax. */
+static bool pados_parse_tls_arguments(const char *cursor, const char *end, uint32_t fields[3])
+{
+	for (size_t i = 0; i < 3; i++) {
+		const char *start = cursor;
+		uint32_t value = 0;
+		while (cursor < end && *cursor != ',') {
+			char character = *cursor++;
+			unsigned int digit;
+			if (character >= '0' && character <= '9')
+				digit = character - '0';
+			else if (character >= 'a' && character <= 'f')
+				digit = character - 'a' + 10;
+			else if (character >= 'A' && character <= 'F')
+				digit = character - 'A' + 10;
+			else
+				return false;
+			if (value > (UINT32_MAX - digit) / 16)
+				return false;
+			value = value * 16 + digit;
+		}
+		if (cursor == start || (i < 2 ? cursor == end : cursor != end))
+			return false;
+		fields[i] = value;
+		if (i < 2)
+			cursor++;
+	}
+	return true;
+}
+
+static int pados_thread_packet(struct connection *connection, const char *packet, int packet_size)
+{
+	if (packet_size < 12 || memcmp(packet, "qGetTLSAddr:", 12))
+		return rtos_thread_packet(connection, packet, packet_size);
+
+	uint32_t fields[3];
+	if (!pados_parse_tls_arguments(packet + 12, packet + packet_size, fields))
+		return gdb_put_packet(connection, "E01", 3);
+
+	struct target *target = get_target_from_connection(connection);
+	uint32_t address;
+	int retval = pados_get_tls_address(target->rtos, fields[0], fields[1], fields[2], &address);
+	if (retval != ERROR_OK)
+		return gdb_put_packet(connection, "E01", 3);
+
+	char reply[2 * sizeof(address) + 1];
+	int length = snprintf(reply, sizeof(reply), "%" PRIx32, address);
+	return gdb_put_packet(connection, reply, length);
+}
+
 static int pados_get_thread_stack(struct rtos *rtos, threadid_t thread_id,
 		uint32_t info[PADOS_INFO_COUNT], uint32_t *stack)
 {
@@ -516,6 +629,7 @@ static int pados_create(struct target *target)
 		LOG_ERROR("PadOS: only Cortex-M targets are supported");
 		return ERROR_FAIL;
 	}
+	target->rtos->gdb_thread_packet = pados_thread_packet;
 	return ERROR_OK;
 }
 

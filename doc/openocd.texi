@@ -13644,7 +13644,7 @@ contrib/rtos-helpers/FreeRTOS-openocd.c
 contrib/rtos-helpers/uCOS-III-openocd.c
 @end table
 
-PadOS support requires the STM32H7 Cortex-M port and version 1 of the debugger
+PadOS support requires the STM32H7 Cortex-M port and version 2 of the debugger
 interface defined in @file{Include/Kernel/KDebugger.h}. The firmware must retain
 @code{_kernel_debugger_info} and its referenced metadata. Enable support with:
 
@@ -13656,6 +13656,16 @@ Thread names, states, priorities, and saved core and floating-point registers
 are available. PadOS thread IDs are used directly, except that idle's ID zero
 is reported as @code{0x7fffffff}, which the firmware must reserve from PID
 allocation.
+
+Thread-local variables are supported through @code{qGetTLSAddr}. This requires
+a PadOS-aware GDB using the @code{PadOS} OS ABI. The load-module argument is
+@code{1} for the kernel image and @code{2} for the user-space image; it refers
+to the image defining the variable, independently of the thread's current
+execution mode. The offset is measured from the start of that image's TLS
+data, after the thread control block. OpenOCD reads the appropriate TLS
+pointer from the requested thread and obtains the control-block size from
+the debugger interface. Requests for an unavailable TLS block return an
+error. No target code is executed to resolve the address.
 
 @anchor{usingopenocdsmpwithgdb}
 @section Using OpenOCD SMP with GDB

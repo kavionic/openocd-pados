@@ -4,7 +4,7 @@
 #define OPENOCD_RTOS_PADOS_H
 
 /*
- * Wire layout of PadOS debugger interface version 1.
+ * Wire layout of PadOS debugger interface version 2.
  * The authoritative definition is Include/Kernel/KDebugger.h in PadOS.
  * Descriptor entries are target-endian 32-bit words, including pointers.
  * Offsets and state values come from the firmware, not its C++ ABI.
@@ -39,11 +39,17 @@ enum pados_info_field {
 	PADOS_EXTENDED_REGISTER_OFFSETS,
 	PADOS_FLOATING_POINT_REGISTER_COUNT,
 	PADOS_FLOATING_POINT_REGISTER_OFFSETS,
+	PADOS_THREAD_KERNEL_TLS_OFFSET,
+	PADOS_THREAD_USERSPACE_TLS_OFFSET,
+	PADOS_TLS_DATA_OFFSET,
 	PADOS_INFO_COUNT,
 };
 
-#define PADOS_INTERFACE_VERSION 1
+#define PADOS_INTERFACE_VERSION 2
 #define PADOS_ARCH_CORTEX_M 1
+/* qGetTLSAddr load-module IDs defined by the PadOS debugger interface. */
+#define PADOS_TLS_MODULE_KERNEL 1
+#define PADOS_TLS_MODULE_USERSPACE 2
 #define PADOS_REGISTER_SP UINT16_MAX
 /* PadOS reserves this PID so GDB can represent the idle thread's zero ID. */
 #define PADOS_IDLE_THREAD_ID INT32_MAX
